@@ -11,7 +11,9 @@ cache = Cache("burp_thinker_cache.sqlite")
 providers = ProviderFactory()
 conv = ConversationManager(providers, cache)
 
+# simple in-memory background task store
 _tasks = {}
+
 
 def run_background(task_id, func, *args, **kwargs):
     def wrapper():
@@ -25,12 +27,14 @@ def run_background(task_id, func, *args, **kwargs):
     t = threading.Thread(target=wrapper, daemon=True)
     t.start()
 
+
 def auth_check(authorization: Optional[str]):
     token = os.getenv("BURP_THINKER_TOKEN", "local-secret")
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing authorization")
     if authorization.split()[1] != token:
         raise HTTPException(status_code=403, detail="Invalid token")
+
 
 @router.post("/analyze/request")
 async def analyze_request(payload: dict, request: Request, authorization: Optional[str] = Header(None)):
@@ -41,15 +45,32 @@ async def analyze_request(payload: dict, request: Request, authorization: Option
     cached = cache.get(key)
     if cached:
         return {"cached": True, "result": cached}
+
     # support async mode
     if request.headers.get("X-Async") == "1":
         task_id = str(uuid.uuid4())
         _tasks[task_id] = {"status": "queued", "result": None}
         run_background(task_id, conv.analyze_request, raw)
         return {"task_id": task_id}, 202
+
     result = conv.analyze_request(raw)
-    cache.set(key, result)
-    return result
+
+    # Normalize provider response to spec
+    if isinstance(result, dict):
+        if "data" in result and isinstance(result["data"], dict):
+            out = result["data"]
+        elif "summary" in result:
+            out = {"summary": result.get("summary")}
+        elif "analysis" in result:
+            out = {"summary": result.get("analysis")}
+        else:
+            out = result
+    else:
+        out = {"summary": str(result)}
+
+    cache.set(key, out)
+    return out
+
 
 @router.post("/analyze/response")
 async def analyze_response(payload: dict, request: Request, authorization: Optional[str] = Header(None)):
@@ -60,14 +81,28 @@ async def analyze_response(payload: dict, request: Request, authorization: Optio
     cached = cache.get(key)
     if cached:
         return {"cached": True, "result": cached}
+
     if request.headers.get("X-Async") == "1":
         task_id = str(uuid.uuid4())
         _tasks[task_id] = {"status": "queued", "result": None}
         run_background(task_id, conv.analyze_response, raw)
         return {"task_id": task_id}, 202
+
     result = conv.analyze_response(raw)
-    cache.set(key, result)
-    return result
+
+    if isinstance(result, dict):
+        if "data" in result and isinstance(result["data"], dict):
+            out = result["data"]
+        elif "analysis" in result:
+            out = {"analysis": result.get("analysis")}
+        else:
+            out = result
+    else:
+        out = {"analysis": str(result)}
+
+    cache.set(key, out)
+    return out
+
 
 @router.post("/payloads/sqli")
 async def payloads_sqli(payload: dict, authorization: Optional[str] = Header(None)):
@@ -78,9 +113,19 @@ async def payloads_sqli(payload: dict, authorization: Optional[str] = Header(Non
     cached = cache.get(key)
     if cached:
         return {"cached": True, "payloads": cached}
+
     res = conv.generate_sqli(param, dbms)
-    cache.set(key, res)
-    return {"payloads": res}
+    # normalize
+    if isinstance(res, dict) and "payloads" in res:
+        payloads = res["payloads"]
+    elif isinstance(res, list):
+        payloads = res
+    else:
+        payloads = [str(res)]
+
+    cache.set(key, payloads)
+    return {"payloads": payloads}
+
 
 @router.post("/jwt")
 async def analyze_jwt(payload: dict, authorization: Optional[str] = Header(None)):
@@ -96,6 +141,7 @@ async def analyze_jwt(payload: dict, authorization: Optional[str] = Header(None)
     cache.set(key, res)
     return res
 
+
 @router.get("/tasks/{task_id}")
 async def get_task(task_id: str, authorization: Optional[str] = Header(None)):
     auth_check(authorization)
@@ -103,3 +149,20 @@ async def get_task(task_id: str, authorization: Optional[str] = Header(None)):
     if not t:
         raise HTTPException(status_code=404, detail="task not found")
     return {"task_id": task_id, "status": t["status"], "result": t["result"]}
+
+
+# Streaming endpoints (SSE) - optional, requires provider support
+from fastapi.responses import StreamingResponse
+
+
+@router.get("/stream/analyze/request")
+async def stream_analyze_request(request: Request, authorization: Optional[str] = Header(None)):
+    auth_check(authorization)
+    # Expect raw request in query param or headers for streaming proxies (limited use-case)
+    return HTTPException(status_code=501, detail="Streaming not supported in this deployment")
+
+
+@router.get("/stream/analyze/response")
+async def stream_analyze_response(request: Request, authorization: Optional[str] = Header(None)):
+    auth_check(authorization)
+    return HTTPException(status_code=501, detail="Streaming not supported in this deployment")
