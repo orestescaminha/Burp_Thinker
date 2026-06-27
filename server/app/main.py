@@ -15,7 +15,7 @@ if not os.path.isdir(static_dir):
     except Exception:
         pass
 
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/static", StaticFiles(directory=static_dir, html=True), name="static")
 
 
 @app.get("/")

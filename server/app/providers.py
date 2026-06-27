@@ -67,36 +67,96 @@ class ClaudeProvider(Provider):
         except Exception as e:
             return {"result": f"[claude provider error: {e}]"}
 
+# server/app/providers.py
+# ...keep the earlier parts of the file unchanged up to GeminiProvider...(editado: atualiza para google-genai)
+
 class GeminiProvider(Provider):
     def __init__(self):
-        # google generative ai client (google-generativeai)
+        # Try new google.genai first, then fallback to google.generativeai
         try:
-            import google.generativeai as genai
+            import google.genai as genai  # type: ignore
             self.genai = genai
+            self.genai_variant = "genai"
         except Exception:
-            self.genai = None
+            try:
+                import google.generativeai as genai  # type: ignore
+                self.genai = genai
+                self.genai_variant = "generativeai"
+            except Exception:
+                self.genai = None
+                self.genai_variant = None
         self.api_key = os.getenv("GEMINI_API_KEY")
 
     def complete(self, prompt: str, max_tokens: int = 512):
         if not self.genai or not self.api_key:
             return {"result": f"[stubbed Gemini response for prompt length {len(prompt)}]"}
+
         try:
-            self.genai.configure(api_key=self.api_key)
-            # example using chat.completions (API can vary)
-            resp = self.genai.chat.completions.create(model="gemini-pro", messages=[{"role":"user","content":prompt}], max_output_tokens=max_tokens)
-            # parse response
+            # Older package: configure()
+            if self.genai_variant == "generativeai":
+                if hasattr(self.genai, "configure"):
+                    self.genai.configure(api_key=self.api_key)
+                # try chat completions path
+                if hasattr(self.genai, "chat") and hasattr(self.genai.chat, "completions"):
+                    resp = self.genai.chat.completions.create(model="gemini-pro", messages=[{"role":"user","content":prompt}], max_output_tokens=max_tokens)
+                elif hasattr(self.genai, "GenerativeModel"):
+                    model = self.genai.GenerativeModel("gemini-pro")
+                    resp = model.generate_content(prompt)
+                else:
+                    resp = self.genai.generate(prompt) if hasattr(self.genai, "generate") else {"result": str(self.genai)}
+            # New package: try multiple call shapes
+            elif self.genai_variant == "genai":
+                # try chat completions style first
+                if hasattr(self.genai, "chat") and hasattr(self.genai.chat, "completions"):
+                    resp = self.genai.chat.completions.create(model="gemini-pro", messages=[{"role":"user","content":prompt}], max_output_tokens=max_tokens)
+                elif hasattr(self.genai, "generate_text"):
+                    resp = self.genai.generate_text(model="gemini-pro", text=prompt, max_output_tokens=max_tokens)
+                elif hasattr(self.genai, "GenerativeModel"):
+                    client = self.genai.GenerativeModel("gemini-pro")
+                    if hasattr(client, "generate_content"):
+                        resp = client.generate_content(prompt)
+                    elif hasattr(client, "generate_text"):
+                        resp = client.generate_text(prompt)
+                    else:
+                        resp = {"result": str(client)}
+                elif hasattr(self.genai, "generate"):
+                    resp = self.genai.generate(model="gemini-pro", prompt=prompt, max_output_tokens=max_tokens)
+                else:
+                    resp = {"result": str(self.genai)}
+            else:
+                return {"result": "[gemini provider error: no supported SDK]"}
+
+            # parse response generically
             content = ""
             if isinstance(resp, dict):
                 choices = resp.get("candidates") or resp.get("choices") or []
                 if choices:
-                    content = choices[0].get("content", "")
+                    # choose first candidate/content if present
+                    first = choices[0]
+                    if isinstance(first, dict):
+                        content = first.get("content") or first.get("text") or str(first)
+                    else:
+                        content = str(first)
                 else:
-                    content = str(resp)
+                    # maybe direct keys
+                    content = resp.get("result") or resp.get("output") or str(resp)
             else:
+                # try attribute-based parsing
                 try:
-                    content = resp.candidates[0].content
+                    if hasattr(resp, "candidates") and resp.candidates:
+                        content = resp.candidates[0].content
+                    elif hasattr(resp, "choices") and len(resp.choices) > 0:
+                        ch = resp.choices[0]
+                        if hasattr(ch, "message"):
+                            msg = ch.message
+                            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", str(msg))
+                        else:
+                            content = getattr(ch, "text", str(ch))
+                    else:
+                        content = str(resp)
                 except Exception:
                     content = str(resp)
+
             return {"result": content}
         except Exception as e:
             return {"result": f"[gemini provider error: {e}]"}
