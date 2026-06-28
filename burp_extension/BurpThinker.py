@@ -10,12 +10,14 @@ API_URL = "http://127.0.0.1:8000"
 TOKEN = "local-secret"  # Burp extension never stores provider keys; this is local API token
 
 class BurpExtender(IBurpExtender, IContextMenuFactory):
-    def registerExtenderSelf(self, callbacks):
+    def registerExtenderCallbacks(self, callbacks):
+        """Required by Burp Suite API to register the extension."""
         self._callbacks = callbacks
         callbacks.setExtensionName("Burp Thinker")
         callbacks.registerContextMenuFactory(self)
 
     def createMenuItems(self, invocation):
+        """Create context menu items for Burp Thinker actions."""
         menu = []
         m1 = JMenuItem("Send to AI -> Analyze Request", actionPerformed=lambda ev, inv=invocation: self.send_action(inv, "analyze_request"))
         m2 = JMenuItem("Send to AI -> Analyze Response", actionPerformed=lambda ev, inv=invocation: self.send_action(inv, "analyze_response"))
@@ -24,6 +26,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
         return menu
 
     def send_action(self, invocation, action):
+        """Handle context menu action selection."""
         selected = invocation.getSelectedMessages()
         if selected is None or len(selected) == 0:
             return
@@ -33,6 +36,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
         t.start()
 
     def _do_post(self, action, raw):
+        """Send HTTP request/response to Burp Thinker API for analysis."""
         try:
             url = URL(API_URL + ("/analyze/request" if action=="analyze_request" else "/analyze/response"))
             conn = url.openConnection()
