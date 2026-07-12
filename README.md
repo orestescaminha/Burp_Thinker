@@ -57,8 +57,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 Observação: providers são tolerantes — se a SDK ou a API key não estiver presente, eles retornam uma resposta stub em vez de travar.
 
-
 # Como Usar
+```
     No Burp Suite:
         Vá para Extensions → Installed
         Clique Add (ou arrastar arquivo)
@@ -73,33 +73,36 @@ Observação: providers são tolerantes — se a SDK ou a API key não estiver p
             "Send to AI -> Analyze Request"
             "Send to AI -> Analyze Response"
         Clique uma delas — a extensão enviará para o servidor local (127.0.0.1:8000) e exibirá o resultado no console de saída do Burp
-        
-    Veja o console — você verá logs tipo:
-´´´    
-    [*] Burp Thinker extension loaded successfully
-    [*] API URL: http://127.0.0.1:8000
-    [*] Token: ***
-    [*] Action triggered: analyze_request
-    [*] Selected 1 message(s)
-    [*] Raw message length: 45 bytes
-    [*] Background thread started for analysis
-    [*] Starting POST request...
-    [*] URL: http://127.0.0.1:8000/analyze/request
-    [*] Headers set
-    [*] Body prepared, size: 67 bytes
-    [*] Body sent
-    [*] Response code: 200
-    [+] Burp Thinker result (HTTP 200):
-    {"summary":"...","interesting_parameters":[...]}
-´´´
+```        
+
+Veja o console — você verá logs tipo:
+
+```[*] Burp Thinker extension loaded successfully
+[*] API URL: http://127.0.0.1:8000
+[*] Token: ***
+[*] Action triggered: analyze_request
+[*] Selected 1 message(s)
+[*] Raw message length: 45 bytes
+[*] Background thread started for analysis
+[*] Starting POST request...
+[*] URL: http://127.0.0.1:8000/analyze/request
+[*] Headers set
+[*] Body prepared, size: 67 bytes
+[*] Body sent
+[*] Response code: 200
+[+] Burp Thinker result (HTTP 200):
+{"summary":"...","interesting_parameters":[...]}
+```
+
 Se houver erro:
-´´´
-    [!] No messages selected → nenhuma requisição/resposta selecionada
-    [!] Connection refused → servidor (127.0.0.1:8000) não está rodando
-    [!] Response code: 422 → erro de validação (payload/token inválido)
-    [!] Response code: 401 → token incorreto
-    Traceback completo vai aparecer no console
-´´´
+
+```[!] No messages selected → nenhuma requisição/resposta selecionada
+[!] Connection refused → servidor (127.0.0.1:8000) não está rodando
+[!] Response code: 422 → erro de validação (payload/token inválido)
+[!] Response code: 401 → token incorreto
+Traceback completo vai aparecer no console
+```
+
 # Como testar localmente (passo a passo)
 Testes usando uma solicitação GET básica. Normalmente é uma etapa inicial de reconhecimento para verificar se o servidor web está ativo e recuperar o conteúdo da página padrão, geralmente um arquivo index.
 ## Endpoints e exemplos curl
