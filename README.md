@@ -118,7 +118,7 @@ Navigate to the `server` directory and start the Uvicorn server:
 
 ```bash
 cd server
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 **Note:** To ensure environment variables from `.env` are loaded correctly, it's best to stop and restart the server completely if you modify `.env`.
