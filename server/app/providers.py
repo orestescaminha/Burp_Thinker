@@ -1,9 +1,12 @@
 import os
 from abc import ABC, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Provider(ABC):
     @abstractmethod
-    def complete(self, prompt: str, max_tokens: int = 512):
+    def complete(self, prompt: str, max_tokens: int = 2048):
         """Return a dict like {'result': '...'}"""
         pass
 
@@ -16,7 +19,7 @@ class OpenAIProvider(Provider):
             self.openai = None
         self.api_key = os.getenv("OPENAI_API_KEY")
 
-    def complete(self, prompt: str, max_tokens: int = 512):
+    def complete(self, prompt: str, max_tokens: int = 2048):
         if not self.openai or not self.api_key:
             return {"result": f"[stubbed OpenAI response for prompt length {len(prompt)}]"}
         try:
@@ -51,7 +54,7 @@ class ClaudeProvider(Provider):
             self.anthropic = None
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
 
-    def complete(self, prompt: str, max_tokens: int = 512):
+    def complete(self, prompt: str, max_tokens: int = 2048):
         if not self.anthropic or not self.api_key:
             return {"result": f"[stubbed Claude response for prompt length {len(prompt)}]"}
         try:
@@ -67,111 +70,74 @@ class ClaudeProvider(Provider):
         except Exception as e:
             return {"result": f"[claude provider error: {e}]"}
 
-# server/app/providers.py
-# ...keep the earlier parts of the file unchanged up to GeminiProvider...(editado: atualiza para google-genai)
-
 class GeminiProvider(Provider):
     def __init__(self):
-        # Try new google.genai first, then fallback to google.generativeai
+        self.genai = None
         try:
-            import google.genai as genai  # type: ignore
+            # Explicitly import the stable library to avoid conflicts
+            import google.generativeai as genai
             self.genai = genai
-            self.genai_variant = "genai"
-        except Exception:
-            try:
-                import google.generativeai as genai  # type: ignore
-                self.genai = genai
-                self.genai_variant = "generativeai"
-            except Exception:
-                self.genai = None
-                self.genai_variant = None
+            logger.info("Successfully imported google.generativeai SDK.")
+        except ImportError:
+            logger.error("Failed to import google.generativeai. Make sure 'google-generativeai' is installed.")
+        
         self.api_key = os.getenv("GEMINI_API_KEY")
+        if not self.api_key:
+            logger.error("GEMINI_API_KEY environment variable not found.")
+        else:
+            logger.info("GEMINI_API_KEY loaded.")
+            
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-pro-latest")
 
-    def complete(self, prompt: str, max_tokens: int = 512):
+    def complete(self, prompt: str, max_tokens: int = 4096):
         if not self.genai or not self.api_key:
-            return {"result": f"[stubbed Gemini response for prompt length {len(prompt)}]"}
+            return {"result": f"[stubbed Gemini response: Gemini SDK or API key not configured]"}
 
         try:
-            # Older package: configure()
-            if self.genai_variant == "generativeai":
-                if hasattr(self.genai, "configure"):
-                    self.genai.configure(api_key=self.api_key)
-                # try chat completions path
-                if hasattr(self.genai, "chat") and hasattr(self.genai.chat, "completions"):
-                    resp = self.genai.chat.completions.create(model="gemini-pro", messages=[{"role":"user","content":prompt}], max_output_tokens=max_tokens)
-                elif hasattr(self.genai, "GenerativeModel"):
-                    model = self.genai.GenerativeModel("gemini-pro")
-                    resp = model.generate_content(prompt)
-                else:
-                    resp = self.genai.generate(prompt) if hasattr(self.genai, "generate") else {"result": str(self.genai)}
-            # New package: try multiple call shapes
-            elif self.genai_variant == "genai":
-                # try chat completions style first
-                if hasattr(self.genai, "chat") and hasattr(self.genai.chat, "completions"):
-                    resp = self.genai.chat.completions.create(model="gemini-pro", messages=[{"role":"user","content":prompt}], max_output_tokens=max_tokens)
-                elif hasattr(self.genai, "generate_text"):
-                    resp = self.genai.generate_text(model="gemini-pro", text=prompt, max_output_tokens=max_tokens)
-                elif hasattr(self.genai, "GenerativeModel"):
-                    client = self.genai.GenerativeModel("gemini-pro")
-                    if hasattr(client, "generate_content"):
-                        resp = client.generate_content(prompt)
-                    elif hasattr(client, "generate_text"):
-                        resp = client.generate_text(prompt)
-                    else:
-                        resp = {"result": str(client)}
-                elif hasattr(self.genai, "generate"):
-                    resp = self.genai.generate(model="gemini-pro", prompt=prompt, max_output_tokens=max_tokens)
-                else:
-                    resp = {"result": str(self.genai)}
-            else:
-                return {"result": "[gemini provider error: no supported SDK]"}
-
-            # parse response generically
-            content = ""
-            if isinstance(resp, dict):
-                choices = resp.get("candidates") or resp.get("choices") or []
-                if choices:
-                    # choose first candidate/content if present
-                    first = choices[0]
-                    if isinstance(first, dict):
-                        content = first.get("content") or first.get("text") or str(first)
-                    else:
-                        content = str(first)
-                else:
-                    # maybe direct keys
-                    content = resp.get("result") or resp.get("output") or str(resp)
-            else:
-                # try attribute-based parsing
-                try:
-                    if hasattr(resp, "candidates") and resp.candidates:
-                        content = resp.candidates[0].content
-                    elif hasattr(resp, "choices") and len(resp.choices) > 0:
-                        ch = resp.choices[0]
-                        if hasattr(ch, "message"):
-                            msg = ch.message
-                            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", str(msg))
-                        else:
-                            content = getattr(ch, "text", str(ch))
-                    else:
-                        content = str(resp)
-                except Exception:
-                    content = str(resp)
-
-            return {"result": content}
+            # Use the configure() and GenerativeModel() pattern for the google.generativeai library
+            self.genai.configure(api_key=self.api_key)
+            
+            generation_config = self.genai.types.GenerationConfig(
+                max_output_tokens=max_tokens
+            )
+            model = self.genai.GenerativeModel(
+                model_name=self.model_name,
+                generation_config=generation_config
+            )
+            
+            response = model.generate_content(prompt)
+            result_text = response.text
+            return {"result": result_text}
         except Exception as e:
             return {"result": f"[gemini provider error: {e}]"}
 
 class LocalLLMProvider(Provider):
-    def complete(self, prompt: str, max_tokens: int = 512):
+    def complete(self, prompt: str, max_tokens: int = 2048):
         return {"result": f"[local-llm-stub response for prompt len {len(prompt)}]"}
 
 class ProviderFactory:
     def __init__(self):
-        self.providers = {
-            "openai": OpenAIProvider(),
-            "claude": ClaudeProvider(),
-            "gemini": GeminiProvider(),
-            "local": LocalLLMProvider()
+        self.provider_classes = {
+            "openai": OpenAIProvider,
+            "claude": ClaudeProvider,
+            "gemini": GeminiProvider,
+            "local": LocalLLMProvider
         }
-    def get(self, name="openai"):
-        return self.providers.get(name, self.providers["local"])
+        self.providers_cache = {}
+
+    def get(self, name=None):
+        if name is None:
+            name = os.getenv("BURP_THINKER_PROVIDER", "gemini")
+        
+        if name in self.providers_cache:
+            return self.providers_cache[name]
+
+        provider_class = self.provider_classes.get(name)
+        if provider_class:
+            instance = provider_class()
+            self.providers_cache[name] = instance
+            return instance
+        
+        # Fallback to gemini if the name is invalid
+        logger.warning(f"Provider '{name}' not found, falling back to 'gemini'.")
+        return self.get("gemini")

@@ -40,7 +40,7 @@ class GeminiClient:
 
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-pro")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-pro-latest")
         self.client = None
         # We don't eagerly instantiate a client for all SDK variants; handle at call time.
         self.variant = GENAI_VARIANT

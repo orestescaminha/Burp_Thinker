@@ -3,6 +3,11 @@ from .routes import router
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, Response
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# This should be one of the first things to run
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 app = FastAPI(title="Burp Thinker API", version="0.1.0")
 app.include_router(router)
