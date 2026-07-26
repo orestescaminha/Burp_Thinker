@@ -151,7 +151,8 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 3.  In the context menu, go to `Extensions -> Burp Thinker`.
 4.  Select the desired AI action (e.g., `Analyze Request`, `Generate XSS Payloads`, `Explain CSP`).
 5.  The extension will send the relevant data to your local FastAPI server.
-6.  The AI's analysis or generated content will be displayed in the Burp Extender output console.
+6.  In the Burp_Thinker tab, click the new row that appears in the history table. The details panel will display a nice, easy-to-read HTML preview
+7.  The JSON AI's analysis or generated content will also be displayed in the Burp Extender output console.
 
 **Example Output in Burp Extender Console:**
 
@@ -211,7 +212,6 @@ The FastAPI server exposes the following main endpoints:
 ## Future Enhancements
 
 *   **Java Extension:** Implement the Burp extension in Java for better performance, tighter integration with Burp's API, and a more polished UI. The current Jython script serves as a functional Proof-of-Concept.
-*   **Enhanced UI:** Develop a dedicated UI panel within Burp to display AI analysis results more interactively, rather than just in the Extender output.
 *   **More AI Actions:** Expand the range of AI-powered security testing actions.
 *   **Configurable LLM Parameters:** Allow users to configure LLM parameters (temperature, top_p, etc.) via the UI or configuration file.
 *   **Endpoint for Health Checks:** Add a simple `GET /health` endpoint for monitoring server status.
