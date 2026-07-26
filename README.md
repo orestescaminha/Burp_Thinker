@@ -6,6 +6,7 @@
 ![License](https://img.shields.io/github/license/orestescaminha/Burp_Thinker)
 
 Burp Thinker is a Burp Suite extension designed to integrate Artificial Intelligence (AI) capabilities, specifically leveraging large language models (LLMs) like Google Gemini, directly into your web penetration testing workflow. It provides a context menu (`Right click -> Send to AI`) to send HTTP requests, responses, or selected text to a local FastAPI server for AI-powered analysis and generation tasks.
+The results, history, and details are displayed in a dedicated graphical interface within Burp (HTML) as well as in the extension console (JSON).
 
 ## Features
 
