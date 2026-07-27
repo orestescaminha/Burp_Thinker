@@ -1,6 +1,8 @@
 # Jython Burp extension (run under Burp's Jython env).
 from burp import IBurpExtender, IContextMenuFactory, ITab
-from javax.swing import JMenuItem, JSplitPane, JScrollPane, JTable, JPanel, JButton, JTextPane
+from javax.swing import JMenuItem, JSplitPane, JScrollPane, JTable, JPanel, JButton, JTextPane, JFileChooser
+from javax.swing.event import HyperlinkListener, HyperlinkEvent
+from java.io import File, FileWriter
 from javax.swing.table import DefaultTableModel
 from java.awt import BorderLayout
 from java.awt.event import ActionListener
@@ -15,6 +17,25 @@ from javax.swing import SwingUtilities
 # --- Configuration ---
 API_URL = "http://127.0.0.1:8000"
 TOKEN = os.environ.get("BURP_THINKER_TOKEN", "local-secret")
+
+def safe_unicode(val):
+    """Safely converts any value to a unicode string in Jython (Python 2.7)."""
+    if val is None:
+        return u"N/A"
+    if isinstance(val, unicode):
+        return val
+    if isinstance(val, str):
+        try:
+            return val.decode('utf-8')
+        except Exception:
+            try:
+                return val.decode('latin-1', 'replace')
+            except Exception:
+                return unicode(val)
+    try:
+        return unicode(val)
+    except Exception:
+        return u"[Unconvertible Value]"
 
 # --- UI Class for the new Tab ---
 class BurpThinkerTab(ITab):
@@ -54,6 +75,8 @@ class BurpThinkerTab(ITab):
 
         # Add a listener to the history table to show details on selection
         self.history_table.getSelectionModel().addListSelectionListener(self.on_history_selection)
+        # Add a hyperlink listener to the result pane for interactive links (e.g., download button)
+        self.result_pane.addHyperlinkListener(self.on_hyperlink_click)
 
     def getTabCaption(self):
         return "Burp Thinker"
@@ -83,10 +106,14 @@ class BurpThinkerTab(ITab):
                 self.result_pane.setText("")
                 return
             
+            # Extract action and target from the table model
+            action = self.history_model.getValueAt(selected_row, 1)
+            target = self.history_model.getValueAt(selected_row, 2)
+            
             result_data = self.history_data[selected_row]
             self._callbacks.printOutput("[UI DEBUG] Data for row: " + json.dumps(result_data))
 
-            html_content = self._format_json_to_html(result_data)
+            html_content = self._format_json_to_html(result_data, target, action)
             self._callbacks.printOutput("[UI DEBUG] Generated HTML (first 100 chars): " + html_content[:100])
             
             self.result_pane.setText(html_content)
@@ -96,16 +123,17 @@ class BurpThinkerTab(ITab):
             import traceback
             self._callbacks.printError(traceback.format_exc())
 
-    def _format_json_to_html(self, data):
+    def _format_json_to_html(self, data, target=None, action=None):
         """Converts a JSON analysis object into a nicely formatted HTML string."""
         try:
             if not isinstance(data, dict):
-                return "<html><pre>" + str(data) + "</pre></html>"
+                return u"<html><pre>" + safe_unicode(data) + u"</pre></html>"
 
             # Basic CSS for styling
-            style = """
+            style = u"""
             <style>
                 body { font-family: sans-serif; margin: 5px; }
+                .meta-box { background-color: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 15px; border-left: 5px solid #FF6633; }
                 h2 { color: #FF6633; border-bottom: 1px solid #FF6633; padding-bottom: 2px; margin-top: 15px;}
                 h3 { color: #333; margin-top: 10px; }
                 ul { list-style-type: disc; margin-left: 20px; }
@@ -115,56 +143,68 @@ class BurpThinkerTab(ITab):
             </style>
             """
             
-            html = ["<html><head>", style, "</head><body>"]
+            html = [u"<html><head>", style, u"</head><body>"]
+            
+            # Add Target and Action metadata box at the top
+            if target or action:
+                html.append(u"<div class='meta-box'>")
+                if action:
+                    html.append(u"<strong>Action:</strong> " + safe_unicode(action) + u"<br/>")
+                if target:
+                    html.append(u"<strong>Target:</strong> <code>" + safe_unicode(target) + u"</code>")
+                html.append(u"</div>")
             
             # Handle specific schemas or fallback to generic display
             if "script_code" in data: # Turbo Intruder Script
-                html.append("<h2>Generated Script</h2><pre><code>" + data.get("script_code", "").replace("<", "&lt;") + "</code></pre>")
-                html.append("<h2>Explanation</h2><p>" + data.get("explanation", "") + "</p>")
+                html.append(u"<h2>Generated Script</h2><pre><code>" + safe_unicode(data.get("script_code", "")).replace(u"<", u"&lt;") + u"</code></pre>")
+                html.append(u"<h2>Explanation</h2><p>" + safe_unicode(data.get("explanation", "")) + u"</p>")
                 if data.get("suggested_payloads"):
-                    html.append("<h2>Suggested Payloads</h2><ul>")
+                    html.append(u"<h2>Suggested Payloads</h2><ul>")
                     for item in data["suggested_payloads"]:
-                        html.append("<li><code>" + item.replace("<", "&lt;") + "</code></li>")
+                        html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</code></li>")
                     html.append("</ul>")
             
             elif "payloads" in data: # Generic payload list
-                 html.append("<h2>Generated Payloads</h2><ul>")
+                 html.append(u"<h2>Generated Payloads</h2><ul>")
                  for item in data["payloads"]:
-                    html.append("<li><code>" + item.replace("<", "&lt;") + "</code></li>")
-                 html.append("</ul>")
+                    html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</code></li>")
+                 html.append(u"</ul>")
 
             else: # Generic analysis format
                 for key, value in data.items():
-                    title = key.replace("_", " ").title()
-                    html.append("<h2>" + title + "</h2>")
+                    title = safe_unicode(key).replace(u"_", u" ").title()
+                    html.append(u"<h2>" + title + u"</h2>")
                     
                     if isinstance(value, list) and value:
-                        html.append("<ul>")
+                        html.append(u"<ul>")
                         for item in value:
-                            html.append("<li>" + str(item).replace("<", "&lt;") + "</li>")
-                        html.append("</ul>")
+                            html.append(u"<li>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</li>")
+                        html.append(u"</ul>")
                     elif isinstance(value, dict) and value:
-                        html.append("<ul>")
+                        html.append(u"<ul>")
                         for k, v in value.items():
-                            html.append("<li><strong>" + k + ":</strong> " + str(v).replace("<", "&lt;") + "</li>")
-                        html.append("</ul>")
-                    elif isinstance(value, str) and value:
-                        if "def " in value or "import " in value:
-                             html.append("<pre><code>" + value.replace("<", "&lt;") + "</code></pre>")
+                            html.append(u"<li><strong>" + safe_unicode(k) + u":</strong> " + safe_unicode(v).replace(u"<", u"&lt;") + u"</li>")
+                        html.append(u"</ul>")
+                    elif isinstance(value, (str, unicode)) and value:
+                        val_unicode = safe_unicode(value)
+                        if u"def " in val_unicode or u"import " in val_unicode:
+                             html.append(u"<pre><code>" + val_unicode.replace(u"<", u"&lt;") + u"</code></pre>")
                         else:
-                            html.append("<p>" + value + "</p>")
-                    elif value: # Handle other types like numbers
-                        html.append("<p>" + str(value) + "</p>")
+                            html.append(u"<p>" + val_unicode + u"</p>")
+                    elif value is not None: # Handle other types like numbers
+                        html.append(u"<p>" + safe_unicode(value) + u"</p>")
                     else:
-                        html.append("<p>N/A</p>")
+                        html.append(u"<p>N/A</p>")
 
-            html.append("</body></html>")
-            return "".join(html)
+            # Add a download button at the bottom
+            html.append(u"<div style=\"text-align: center; margin-top: 20px;\"><a href=\"download_html_report\" style=\"display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;\">Download HTML Report</a></div>")
+            html.append(u"</body></html>")
+            return u"".join(html)
         except Exception as e:
             self._callbacks.printError("[UI ERROR] Failed in _format_json_to_html: %s" % str(e))
             import traceback
             self._callbacks.printError(traceback.format_exc())
-            return "<html><body><h2>Error rendering HTML</h2><p>Check the Burp Extender error console for details.</p></body></html>"
+            return u"<html><body><h2>Error rendering HTML</h2><p>Check the Burp Extender error console for details.</p></body></html>"
 
     def clear_history(self, event):
         def do_clear():
@@ -176,6 +216,29 @@ class BurpThinkerTab(ITab):
             self.result_pane.setText("")
         
         SwingUtilities.invokeLater(do_clear)
+
+    def on_hyperlink_click(self, event):
+        if event.getEventType() == HyperlinkEvent.EventType.ACTIVATED:
+            if event.getDescription() == "download_html_report":
+                self.download_html_report()
+
+    def download_html_report(self):
+        file_chooser = JFileChooser()
+        file_chooser.setSelectedFile(File("burp_thinker_report.html"))
+        
+        ret = file_chooser.showSaveDialog(self._main_panel)
+        
+        if ret == JFileChooser.APPROVE_OPTION:
+            file = file_chooser.getSelectedFile()
+            try:
+                writer = FileWriter(file)
+                writer.write(self.result_pane.getText())
+                writer.close()
+                self._callbacks.printOutput("[UI INFO] HTML report saved to: %s" % file.getAbsolutePath())
+            except Exception as e:
+                self._callbacks.printError("[UI ERROR] Failed to save HTML report: %s" % str(e))
+                import traceback
+                self._callbacks.printError(traceback.format_exc())
 
 # --- Main Burp Extender Class ---
 class BurpExtender(IBurpExtender, IContextMenuFactory):
