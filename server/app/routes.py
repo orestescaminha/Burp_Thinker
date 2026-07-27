@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Header, HTTPException
 from .cache import Cache
 from .providers import ProviderFactory
-from .utils import sha256_text, check_size_limits
+from .utils import sha256_text, check_size_limits, optimize_http_payload
 from .conversation import ConversationManager
 from typing import Optional
 import os, uuid, threading
@@ -48,7 +48,11 @@ async def analyze_request(payload: dict, request: Request, authorization: str = 
     auth_check(authorization)
     raw = payload.get("request", "")
     check_size_limits(raw, max_kb=64)
-    key = sha256_text(raw + "analyze_request")
+    
+    # Optimize the HTTP payload by truncating the body if it's too large
+    optimized_raw = optimize_http_payload(raw, max_body_kb=10)
+    
+    key = sha256_text(optimized_raw + "analyze_request")
     
     # Use a dictionary for the cache key to be safe
     cached = cache.get(key)
@@ -59,10 +63,10 @@ async def analyze_request(payload: dict, request: Request, authorization: str = 
     if request.headers.get("X-Async") == "1":
         task_id = str(uuid.uuid4())
         _tasks[task_id] = {"status": "queued", "result": None}
-        run_background(task_id, conv.analyze_request, raw)
+        run_background(task_id, conv.analyze_request, optimized_raw)
         return {"task_id": task_id}, 202
 
-    result = conv.analyze_request(raw)
+    result = conv.analyze_request(optimized_raw)
     cache.set(key, result)
     return result
 
@@ -72,7 +76,11 @@ async def analyze_response(payload: dict, request: Request, authorization: str =
     auth_check(authorization)
     raw = payload.get("response", "")
     check_size_limits(raw, max_kb=512)
-    key = sha256_text(raw + "analyze_response")
+    
+    # Optimize the HTTP payload by truncating the body if it's too large
+    optimized_raw = optimize_http_payload(raw, max_body_kb=10)
+    
+    key = sha256_text(optimized_raw + "analyze_response")
     cached = cache.get(key)
     if cached:
         return {"cached": True, "result": cached}
@@ -80,10 +88,10 @@ async def analyze_response(payload: dict, request: Request, authorization: str =
     if request.headers.get("X-Async") == "1":
         task_id = str(uuid.uuid4())
         _tasks[task_id] = {"status": "queued", "result": None}
-        run_background(task_id, conv.analyze_response, raw)
+        run_background(task_id, conv.analyze_response, optimized_raw)
         return {"task_id": task_id}, 202
 
-    result = conv.analyze_response(raw)
+    result = conv.analyze_response(optimized_raw)
     cache.set(key, result)
     return result
 
