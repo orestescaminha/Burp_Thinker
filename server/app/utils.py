@@ -22,6 +22,28 @@ def parse_raw_http(raw: str):
             headers[k.strip()] = v.strip()
     return {"start_line": start, "headers": headers, "body": body}
 
+def optimize_http_payload(raw: str, max_body_kb: int = 10) -> str:
+    """
+    Parses a raw HTTP message and truncates the body if it exceeds max_body_kb.
+    Keeps the headers completely intact.
+    """
+    try:
+        parsed = parse_raw_http(raw)
+        body = parsed["body"]
+        body_bytes = body.encode("utf-8")
+        
+        if len(body_bytes) > max_body_kb * 1024:
+            truncated_body = body_bytes[:max_body_kb * 1024].decode("utf-8", "replace")
+            note = f"\r\n\r\n[... BODY TRUNCATED BY BURP THINKER FOR OPTIMIZATION. ORIGINAL SIZE: {len(body_bytes)} BYTES ...]\r\n"
+            
+            # Reconstruct the HTTP message with truncated body
+            headers_str = "\r\n".join([f"{k}: {v}" for k, v in parsed["headers"].items()])
+            reconstructed = f"{parsed['start_line']}\r\n{headers_str}\r\n\r\n{truncated_body}{note}"
+            return reconstructed
+    except Exception:
+        pass # Fallback to original if parsing fails
+    return raw
+
 def safe_parse_jwt(token: str):
     try:
         header = jwt.get_unverified_header(token)
