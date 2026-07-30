@@ -61,3 +61,16 @@ class TurboIntruderScript(BaseModel):
     script_code: str = Field(..., description="The Python script code for Turbo Intruder.")
     explanation: str = Field(..., description="An explanation of what the script does and how to use it.")
     suggested_payloads: List[str] = Field(default_factory=list, description="Examples of payloads that could be used with this script.")
+
+class SecurityFinding(BaseModel):
+    """Defines the structure for a single security finding."""
+    title: str = Field(..., description="A concise, descriptive title for the finding (e.g., 'Potential Reflected XSS').")
+    severity: str = Field(..., description="The estimated severity of the finding (e.g., 'High', 'Medium', 'Low', 'Informational').")
+    evidence: str = Field(..., description="A brief, specific quote from the request or response that supports the finding.")
+    description: str = Field(..., description="A clear explanation of the vulnerability or observation.")
+    confidence: str = Field(..., description="The confidence level of the finding (e.g., 'Confirmed', 'Potential').")
+    next_steps: str = Field(..., description="Clear, actionable next steps to confirm or exploit the finding.")
+
+class SecurityAssessment(BaseModel):
+    """Defines the overall structure for a security assessment of an HTTP pair."""
+    findings: List[SecurityFinding] = Field(default_factory=list, description="A list of security findings identified in the HTTP pair.")
