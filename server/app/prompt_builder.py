@@ -202,6 +202,67 @@ Crawl Data:
 ```
 """
 
+SECURITY_ASSESSMENT_JSON_STRUCTURE = """
+{
+  "findings": [
+    {
+      "title": "string",
+      "severity": "string (High, Medium, Low, Informational)",
+      "evidence": "string (brief quote from request/response)",
+      "description": "string",
+      "confidence": "string (Confirmed, Potential)",
+      "next_steps": "string (actionable steps to confirm)"
+    }
+  ]
+}
+"""
+
+def build_security_assessment_prompt(raw_request: str, raw_response: str) -> str:
+    """Build a prompt for a full security assessment of an HTTP request/response pair."""
+    locale = os.getenv("BURP_THINKER_LOCALE", "pt").lower()
+
+    if locale.startswith("en"):
+        instruction = """
+As a senior web application vulnerability analyst, analyze the provided HTTP request and response pair to produce a precise and evidence-based security assessment.
+
+**CRITICAL RULES:**
+- Be objective and factual. Base every statement on observable evidence from the provided data.
+- DO NOT repeat the full request/response; cite only the minimal snippets necessary as evidence.
+- If a vulnerability is only suspected, explicitly classify its `confidence` as "Potential" and clearly state the `next_steps` to confirm it.
+- If no relevant risk is found, return an empty `findings` list.
+
+Respond ONLY with a valid JSON object matching the structure below. Do not include markdown or any extra text.
+"""
+    else: # default: Portuguese
+        instruction = """
+Como um analista sênior de vulnerabilidades em aplicações web, analise o par de requisição e resposta HTTP fornecido para produzir uma avaliação de segurança precisa e fundamentada em evidências.
+
+**REGRAS CRÍTICAS:**
+- Seja objetivo e factual. Baseie cada afirmação em evidências observáveis nos dados fornecidos.
+- NÃO repita a requisição/resposta na íntegra; cite apenas os trechos mínimos necessários como evidência.
+- Caso a vulnerabilidade seja apenas uma suspeita, classifique sua `confidence` explicitamente como "Potencial" e indique claramente os `next_steps` para confirmá-la.
+- Se não houver risco relevante, retorne uma lista `findings` vazia.
+
+Responda APENAS com um objeto JSON válido que corresponda à estrutura abaixo. Não inclua markdown ou qualquer texto extra.
+"""
+
+    return f"""{instruction}
+
+JSON Structure:
+{SECURITY_ASSESSMENT_JSON_STRUCTURE}
+
+=== REQUEST ===
+```http
+{raw_request}
+```
+
+=== RESPONSE ===
+```http
+{raw_response}
+```
+"""
+
+
 TURBO_INTRUDER_SCRIPT_JSON_STRUCTURE = """
 {
   "script_code": "string (Python code for Turbo Intruder)",
