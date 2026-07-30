@@ -193,6 +193,29 @@ async def summarize_crawl(payload: dict, authorization: str = Header(..., descri
     return result
 
 
+@router.post("/analyze/http_pair")
+async def analyze_http_pair(payload: dict, authorization: str = Header(..., description="Bearer token for authorization, e.g., 'Bearer local-secret'")):
+    auth_check(authorization)
+    raw_request = payload.get("request", "")
+    raw_response = payload.get("response", "")
+
+    if not raw_request or not raw_response:
+        raise HTTPException(status_code=400, detail="Both 'request' and 'response' fields are required")
+
+    # Optimize both parts of the payload
+    optimized_request = optimize_http_payload(raw_request, max_body_kb=10)
+    optimized_response = optimize_http_payload(raw_response, max_body_kb=10)
+
+    key = sha256_text(optimized_request + optimized_response + "analyze_http_pair")
+    cached = cache.get(key)
+    if cached:
+        return {"cached": True, "result": cached}
+
+    result = conv.analyze_http_pair(optimized_request, optimized_response)
+    cache.set(key, result)
+    return result
+
+
 @router.post("/generate/turbo_intruder_script")
 async def generate_turbo_intruder_script(payload: dict, authorization: str = Header(..., description="Bearer token for authorization, e.g., 'Bearer local-secret'")):
     auth_check(authorization)
