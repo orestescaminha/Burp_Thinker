@@ -21,7 +21,7 @@ Burp Thinker enhances your Burp Suite experience with the following AI-powered f
 *   **Suggest Fuzzing Strategy:** Receive tailored fuzzing strategies based on HTTP request/response context.
 *   **Summarize Crawl:** Summarize web application crawl data (e.g., list of URLs), identifying interesting points and technologies.
 *   **Generate Turbo Intruder Script:** Generate Python scripts for Burp's Turbo Intruder based on a base HTTP request.
-*   **Analyze JWT:** Analyze JSON Web Tokens for common security issues.
+*   **Analyze Request/Response Pair:** Analyze an HTTP request and the corresponding response.
 
 ## Architecture Overview
 
@@ -189,6 +189,7 @@ The FastAPI server exposes the following main endpoints:
 
 *   `POST /analyze/request`: Analyze an HTTP request.
 *   `POST /analyze/response`: Analyze an HTTP response.
+*   `POST /analyze/http_pair`: Analyze Request/Response Pair
 *   `POST /payloads/sqli`: Generate SQLi payloads.
 *   `POST /payloads/xss`: Generate XSS payloads.
 *   `POST /explain/csp`: Explain a Content Security Policy header.
