@@ -138,8 +138,15 @@ class BurpThinkerTab(ITab):
                 h3 { color: #333; margin-top: 10px; }
                 ul { list-style-type: disc; margin-left: 20px; }
                 li { margin-bottom: 5px; }
-                code { background-color: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+                code { background-color: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
                 pre { background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+                table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+                th { background-color: #f2f2f2; }
+                .severity-high { background-color: #ffcdd2; }
+                .severity-medium { background-color: #fff9c4; }
+                .severity-low { background-color: #e8f5e9; }
+                .severity-informational { background-color: #e3f2fd; }
             </style>
             """
             
@@ -154,8 +161,30 @@ class BurpThinkerTab(ITab):
                     html.append(u"<strong>Target:</strong> <code>" + safe_unicode(target) + u"</code>")
                 html.append(u"</div>")
             
+            # Handle SecurityAssessment schema specifically
+            if "findings" in data and isinstance(data["findings"], list):
+                html.append(u"<h2>Security Assessment Findings</h2>")
+                if not data["findings"]:
+                    html.append(u"<p>No significant security findings were identified.</p>")
+                else:
+                    html.append(u"<table>")
+                    html.append(u"<tr><th>Severity</th><th>Title</th><th>Confidence</th><th>Description</th><th>Evidence</th><th>Next Steps</th></tr>")
+                    
+                    for finding in data["findings"]:
+                        severity = finding.get("severity", "Informational").lower()
+                        html.append(u"<tr class='severity-" + severity + u"'>")
+                        html.append(u"<td>" + safe_unicode(finding.get("severity")) + u"</td>")
+                        html.append(u"<td><strong>" + safe_unicode(finding.get("title")) + u"</strong></td>")
+                        html.append(u"<td>" + safe_unicode(finding.get("confidence")) + u"</td>")
+                        html.append(u"<td>" + safe_unicode(finding.get("description")) + u"</td>")
+                        html.append(u"<td><pre><code>" + safe_unicode(finding.get("evidence")).replace(u"<", u"&lt;") + u"</code></pre></td>")
+                        html.append(u"<td>" + safe_unicode(finding.get("next_steps")) + u"</td>")
+                        html.append(u"</tr>")
+                    
+                    html.append(u"</table>")
+
             # Handle specific schemas or fallback to generic display
-            if "script_code" in data: # Turbo Intruder Script
+            elif "script_code" in data: # Turbo Intruder Script
                 html.append(u"<h2>Generated Script</h2><pre><code>" + safe_unicode(data.get("script_code", "")).replace(u"<", u"&lt;") + u"</code></pre>")
                 html.append(u"<h2>Explanation</h2><p>" + safe_unicode(data.get("explanation", "")) + u"</p>")
                 if data.get("suggested_payloads"):
@@ -273,6 +302,14 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
             menu_item.addActionListener(MenuActionHandler(self, invocation, action_id))
             menu.append(menu_item)
             
+        # Add a separator for the new, more powerful action
+        menu.append(JMenuItem("---"))
+
+        # Analyze Request/Response Pair
+        m9 = JMenuItem("Send to AI -> Analyze Request/Response Pair")
+        m9.addActionListener(MenuActionHandler(self, invocation, "analyze_http_pair"))
+        menu.append(m9)
+        
         return menu
 
     def send_action(self, invocation, action):
@@ -282,10 +319,10 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
             selected = invocation.getSelectedMessages()
             http_message = selected[0] if selected else None
             
-            data_to_send = ""
+            data_to_send = {} # Use a dict for actions that need multiple parts
             target_info = "N/A"
 
-            if not http_message and action not in ["explain_stack_trace", "summarize_crawl"]:
+            if not http_message:
                  self._callbacks.printError("[!] This action requires a selected HTTP message.")
                  return
 
@@ -293,7 +330,18 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
                 service = http_message.getHttpService()
                 target_info = service.getHost() + self._helpers.analyzeRequest(http_message).getUrl().getPath()
 
-            if action in ["explain_stack_trace", "summarize_crawl"]:
+            if action == "analyze_http_pair":
+                request_bytes = http_message.getRequest()
+                response_bytes = http_message.getResponse()
+                if not request_bytes or not response_bytes:
+                    self._callbacks.printError("[!] Action 'Analyze Request/Response Pair' requires a message with both a request and a response.")
+                    return
+                data_to_send = {
+                    "request": self._helpers.bytesToString(request_bytes),
+                    "response": self._helpers.bytesToString(response_bytes)
+                }
+
+            elif action in ["explain_stack_trace", "summarize_crawl"]:
                 selection_bounds = invocation.getSelectionBounds()
                 if not selection_bounds:
                     self._callbacks.printError("[!] Action '%s' requires text selection." % action)
@@ -320,7 +368,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
                     return
                 data_to_send = csp_header
             
-            else: # For all other actions that operate on a full message
+            else: # For all other actions that operate on a single full message
                 if action in ["analyze_request", "generate_xss", "suggest_fuzzing_strategy", "generate_turbo_intruder_script"]:
                     msg_bytes = http_message.getRequest()
                 else:
@@ -331,7 +379,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
                     return
                 data_to_send = self._helpers.bytesToString(msg_bytes)
 
-            self._callbacks.printOutput("[*] Data length for action '%s': %d bytes" % (action, len(data_to_send)))
+            self._callbacks.printOutput("[*] Preparing data for action '%s'" % action)
             
             start_new_thread(self._do_post, (action, target_info, data_to_send))
             self._callbacks.printOutput("[*] Background task started for action: %s" % action)
@@ -350,16 +398,23 @@ class BurpExtender(IBurpExtender, IContextMenuFactory):
                 "analyze_request": "/analyze/request", "analyze_response": "/analyze/response",
                 "generate_xss": "/payloads/xss", "explain_csp": "/explain/csp",
                 "explain_stack_trace": "/explain/stack_trace", "suggest_fuzzing_strategy": "/suggest/fuzzing_strategy",
-                "summarize_crawl": "/summarize/crawl", "generate_turbo_intruder_script": "/generate/turbo_intruder_script"
+                "summarize_crawl": "/summarize/crawl", "generate_turbo_intruder_script": "/generate/turbo_intruder_script",
+                "analyze_http_pair": "/analyze/http_pair"
             }
-            body_keys = {
-                "analyze_request": "request", "analyze_response": "response", "generate_xss": "context",
-                "explain_csp": "csp_header", "explain_stack_trace": "stack_trace", "suggest_fuzzing_strategy": "context",
-                "summarize_crawl": "crawl_data", "generate_turbo_intruder_script": "base_request"
-            }
+            
+            # For the new http_pair action, the data is already a dict.
+            # For others, we build the dict.
+            if action == "analyze_http_pair":
+                body = json.dumps(data)
+            else:
+                body_keys = {
+                    "analyze_request": "request", "analyze_response": "response", "generate_xss": "context",
+                    "explain_csp": "csp_header", "explain_stack_trace": "stack_trace", "suggest_fuzzing_strategy": "context",
+                    "summarize_crawl": "crawl_data", "generate_turbo_intruder_script": "base_request"
+                }
+                body = json.dumps({body_keys.get(action): data})
 
             url_str = API_URL + endpoints.get(action)
-            body = json.dumps({body_keys.get(action): data})
 
             if not url_str or not body:
                 self._callbacks.printError("[!] Unknown action or body key for: %s" % action)
