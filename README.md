@@ -145,6 +145,10 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 You should see `[*] Burp Thinker extension loaded successfully` in the Burp Extender output.
 
+![HTML Output exemple](https://github.com/orestescaminha/Burp_Thinker/blob/main/docs/HTML_Output.png)
+                                 *HTML Output example*
+
+
 ## Usage
 
 1.  **Navigate** to the Proxy tab, Repeater, or any other tab displaying HTTP requests/responses.
