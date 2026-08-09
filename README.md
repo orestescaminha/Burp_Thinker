@@ -186,7 +186,7 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 *   `[!] Response code: 401 Unauthorized`: Check your `BURP_THINKER_TOKEN` in `.env` and ensure it matches the extension's configuration.
 *   `[!] Response code: 422 Unprocessable Content`: Indicates a validation error (e.g., missing required fields in the payload).
   Capture the error body returned by FastAPI (it contains the exact reason):
-```
+```bash
 curl -s -X POST "http://127.0.0.1:8000/analyze/request" \
   -H "Authorization: Bearer local-secret" \
   -H "Content-Type: application/json" \
