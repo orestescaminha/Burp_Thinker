@@ -1,4 +1,4 @@
-# Burp Thinker
+# Burp Thinker v2.3.4
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/orestescaminha/Burp_Thinker)
 ![GitHub issues](https://img.shields.io/github/issues/orestescaminha/Burp_Thinker)
