@@ -89,7 +89,7 @@ class GeminiProvider(Provider):
             
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-pro-latest")
 
-    def complete(self, prompt: str, max_tokens: int = 4096):
+    def complete(self, prompt: str, max_tokens: int = 8192):
         if not self.genai or not self.api_key:
             return {"result": f"[stubbed Gemini response: Gemini SDK or API key not configured]"}
 
