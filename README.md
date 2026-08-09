@@ -181,7 +181,7 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 
 ### Troubleshooting Common Issues
 
-*   `[!] No messages selected`: Ensure you have selected an HTTP message or text.
+*   `[!] No messages selected`: Ensure you have selected an HTTP message or text. For example: the `Explain Stack Trace` action requires selecting a snippet of text (a `stack trace`) within an HTTP request or response in Burp.
 *   `[!] Connection refused`: Verify your FastAPI server is running at `http://127.0.0.1:8000`.
 *   `[!] Response code: 401 Unauthorized`: Check your `BURP_THINKER_TOKEN` in `.env` and ensure it matches the extension's configuration.
 *   `[!] Response code: 422 Unprocessable Content`: Indicates a validation error (e.g., missing required fields in the payload).
