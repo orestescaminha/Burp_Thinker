@@ -186,7 +186,7 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 *   `[!] Response code: 401 Unauthorized`: Check your `BURP_THINKER_TOKEN` in `.env` and ensure it matches the extension's configuration.
 *   `[!] Response code: 422 Unprocessable Content`: Indicates a validation error (e.g., missing required fields in the payload).
 *   `[!] Burp Thinker error: ...`: Check the FastAPI server's console for detailed Python tracebacks.
-
+*   `[!] Unterminated string starting at: line X column Y` error from `json.loads()` indicates that the AI ​​response was truncated in the middle of a string. This can happen when analyzing a request/response pair that requires parsing two blocks of text and generating a detailed JSON structure. This process consumes a large number of input tokens and produces a long response. Our current limit, configured in `providers.py`, is **8192** for the `GeminiProvider`. This value is the maximum supported by many models and should be more than sufficient for the most complex analyses.
 ## API Endpoints
 
 The FastAPI server exposes the following main endpoints:
