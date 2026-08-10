@@ -179,8 +179,22 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 {"summary":"This is a very basic GET request...", "interesting_parameters":[], ...}
 ```
 
-### Troubleshooting Common Issues
-
+## Troubleshooting Common Issues
+### Extensions console logs
+Open the Burp Extensions Tab → Select Burp Thinker → Output
+You will now see logs showing:
+```
+[*] Action triggered: analyze_request
+[*] Selected X message(s)
+[*] Raw message length: XXX bytes
+[*] URL: http://127.0.0.1:8000/analyze/request
+[*] Headers set
+[*] Body sent
+[*] Response code: 200/422/etc
+[+] Burp Thinker result: {...}
+Or [!] Burp Thinker error: ... with a traceback in case something goes wrong
+```
+### Common scenarios that logging can reveal:
 *   `[!] No messages selected`: Ensure you have selected an HTTP message or text. For example: the `Explain Stack Trace` action requires selecting a snippet of text (a `stack trace`) within an HTTP request or response in Burp.
 *   `[!] Connection refused`: Verify your FastAPI server is running at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 *   `[!] Response code: 401 Unauthorized`: Check your `BURP_THINKER_TOKEN` in `.env` and ensure it matches the extension's configuration.
@@ -188,6 +202,84 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 *   `[!] Burp Thinker error: ...`: Check the FastAPI server's console for detailed Python tracebacks.
 *   `[!] Unterminated string starting at: line X column Y` error from `json.loads()` indicates that the AI ​​response was truncated in the middle of a string. This can happen when analyzing a request/response pair that requires parsing two blocks of text and generating a detailed JSON structure. This process consumes a large number of input tokens and produces a long response. Our current limit, configured in `providers.py`, is **8192** for the `GeminiProvider`. This value is the maximum supported by many models and should be more than sufficient for the most complex analyses.
 *   `[!] ValueError: payload too large`: the file `server/app/routes.py` specifies the limit `check_size_limits(raw, max_kb=512)` on line 78. To resolve this, manually change that value.
+*   `[!] Address already in use`: A process is already listening on port 8000 (likely a previous instance of uvicorn). Before restarting, kill the process using port 8000 or use a different port:
+To list/terminate the process:
+```bash
+lsof -i :8000
+kill <PID>
+```
+Or
+```bash
+pkill -f 'uvicorn'
+```
+Or start uvicorn on another port:
+```bash
+python -m uvicorn server.app.main:app --host 127.0.0.1 --port 8001 --reload
+```
+*   `[!] Connection refused`: server is not running on 127.0.0.1:8000 (start uvicorn)
+*   `[!] Timeout`: Server slow or frozen
+### Curl API Testing
+cURL is a powerful command-line tool that allows for quick and direct interaction with APIs, making it ideal for testing and debugging.
+Using the `curl` command is a quick and efficient way to test whether the authentication, validation, and parsing logic are correct.
+A successful `curl` command confirms that your API and server are functioning perfectly.
+When running `curl` command (with the uvicorn server running), you should receive a JSON response from the API containing an output, formatted according to the endpoit schema defined.
+For the `curl` command using the `$BURP_THINKER_TOKEN` variable to work, you need to ensure the variable is exported in your shell (e.g., `export BURP_THINKER_TOKEN=local-secret; echo $BURP_THINKER_TOKEN`) or, if you prefer, insert the token value directly (without reading the .env file) into the `-H 'Authorization: Bearer local-secret'` header, as shown in the examples below:
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/analyze/request' \
+  -H 'accept: application/json' \
+  -H 'Authorization: Bearer local-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "request": "GET / HTTP/1.1\r\nHost: example\r\n\r\n"
+}'
+```
+Command explanation:
+* -X 'POST': Sets the HTTP method to POST. 
+* 'http://127.0.0.1:8000/analyze/request': The URL of the endpoint. 
+* -H 'accept: application/json': Indicates that we expect a JSON response. 
+* -H 'Authorization: Bearer local-secret': The required authentication header. 
+* -H 'Content-Type: application/json': Indicates that the request body is JSON. 
+* -d '{"request": "GET / HTTP/1.1\r\nHost: example\r\n\r\n"}': The request body, containing a JSON object with the key "request" and a value containing the request. "Host: example" in OpenAPI refers to the server's hostname where the API is hosted, i.e., uvicorn server
+The bash script above tests the **Analyze Request** functionality; the structure is the same for testing other features. Though **Explain Stack Trace** and **Summarize Crawl** have slight nuances. Examples follow:
+#### Explain Stack Trace
+To test the "Explain Stack Trace" functionality using curl, you need to send a JSON object—formatted as a single line to avoid shell interpretation issues—containing the stack trace to the `/explain/stack_trace` endpoint.
+Here is an example of how to do this using a simple Python stack trace.
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/explain/stack_trace' \
+  -H 'accept: application/json' \
+  -H 'Authorization: Bearer local-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{"stack_trace": "Traceback (most recent call last):\\n  File \"<stdin>\", line 1, in <module>\\nValueError: Invalid input for function"}'
+```
+**Notes:** 
+* Note that I used `\\n` to ensure that `\n` is interpreted as a line break within the JSON string, and not as a shell escape character. 
+* All -d JSON is enclosed in single quotes and on a single line. 
+* Make sure the stack_trace is all on one line inside the JSON double quotes.
+#### Summarize Crawl
+In Burp, you need to select a text snippet (such as a list of URLs from a crawl) within an HTTP request or response and use the 'Summarize Crawl' option from the menu.
+To test the "Summarize Crawl" functionality using curl, you must send a JSON payload containing the crawl data (for example, a list of URLs or a text-based sitemap) to the `/summarize/crawl` endpoint.
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/summarize/crawl' \
+  -H 'accept: application/json' \
+  -H 'Authorization: Bearer local-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "crawl_data":"http://example.com/index.html\nhttp://example.com/about.html\nhttp://example.com/products?id=1\nhttp://example.com/admin/login.php\nhttp://example.com/api/v1/users"
+}'
+```
+**Note:**
+The request body, containing a JSON object with the key "crawl_data" and a value consisting of a string containing the crawl data (in this example, URLs separated by \n).
+#### Validate JSON responses from endpoints using curl
+You can pipe the curl response to a JSON validator like `jq` to capture the error body returned by FastAPI (it contains the exact reason).:
+```
+curl -s -X POST "http://127.0.0.1:8000/analyze/request" \
+  -H "Authorization: Bearer local-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"request": "GET / HTTP/1.1\r\nHost: example\r\n\r\n"}' | jq
+```
 ## API Endpoints
 
 The FastAPI server exposes the following main endpoints:
