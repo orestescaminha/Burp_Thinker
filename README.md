@@ -182,7 +182,7 @@ You should see `[*] Burp Thinker extension loaded successfully` in the Burp Exte
 ## Troubleshooting Common Issues
 ### Extensions console logs
 Open the Burp Extensions Tab → Select Burp Thinker → Output
-You will now see logs showing:
+You will see logs showing:
 ```
 [*] Action triggered: analyze_request
 [*] Selected X message(s)
@@ -201,7 +201,7 @@ Or [!] Burp Thinker error: ... with a traceback in case something goes wrong
 *   `[!] Response code: 422 Unprocessable Content`: Indicates a validation error (e.g., missing required fields in the payload).
 *   `[!] Burp Thinker error: ...`: Check the FastAPI server's console for detailed Python tracebacks.
 *   `[!] Unterminated string starting at: line X column Y` error from `json.loads()` indicates that the AI ​​response was truncated in the middle of a string. This can happen when analyzing a request/response pair that requires parsing two blocks of text and generating a detailed JSON structure. This process consumes a large number of input tokens and produces a long response. Our current limit, configured in `providers.py`, is **8192** for the `GeminiProvider`. This value is the maximum supported by many models and should be more than sufficient for the most complex analyses.
-*   `[!] ValueError: payload too large`: the file `server/app/routes.py` specifies the limit `check_size_limits(raw, max_kb=512)` on line 78. To resolve this, manually change that value.
+*   `[!] ValueError: payload too large`: the file `server/app/routes.py` specifies the limit `check_size_limits(raw, max_kb=512)` on line 78. To resolve this, manually change that value. HTTP responses, especially those with embedded JavaScript, CSS, or images, may easily exceed this size.
 *   `[!] Address already in use`: A process is already listening on port 8000 (likely a previous instance of uvicorn). Before restarting, kill the process using port 8000 or use a different port:
 To list/terminate the process:
 ```bash
@@ -234,7 +234,7 @@ curl -X 'POST' \
   "request": "GET / HTTP/1.1\r\nHost: example\r\n\r\n"
 }'
 ```
-Command explanation:
+**Command explanation:**
 * -X 'POST': Sets the HTTP method to POST. 
 * 'http://127.0.0.1:8000/analyze/request': The URL of the endpoint. 
 * -H 'accept: application/json': Indicates that we expect a JSON response. 
@@ -242,7 +242,7 @@ Command explanation:
 * -H 'Content-Type: application/json': Indicates that the request body is JSON. 
 * -d '{"request": "GET / HTTP/1.1\r\nHost: example\r\n\r\n"}': The request body, containing a JSON object with the key "request" and a value containing the request. "Host: example" in OpenAPI refers to the server's hostname where the API is hosted, i.e., uvicorn server
 The bash script above tests the **Analyze Request** functionality; the structure is the same for testing other features. Though **Explain Stack Trace** and **Summarize Crawl** have slight nuances. Examples follow:
-#### Explain Stack Trace
+#### Testing 'Explain Stack Trace' 
 To test the "Explain Stack Trace" functionality using curl, you need to send a JSON object—formatted as a single line to avoid shell interpretation issues—containing the stack trace to the `/explain/stack_trace` endpoint.
 Here is an example of how to do this using a simple Python stack trace.
 ```bash
@@ -255,9 +255,9 @@ curl -X 'POST' \
 ```
 **Notes:** 
 * Note that I used `\\n` to ensure that `\n` is interpreted as a line break within the JSON string, and not as a shell escape character. 
-* All -d JSON is enclosed in single quotes and on a single line. 
+* All `-d` JSON is enclosed in single quotes and on a single line. 
 * Make sure the stack_trace is all on one line inside the JSON double quotes.
-#### Summarize Crawl
+#### Testing 'Summarize Crawl'
 In Burp, you need to select a text snippet (such as a list of URLs from a crawl) within an HTTP request or response and use the 'Summarize Crawl' option from the menu.
 To test the "Summarize Crawl" functionality using curl, you must send a JSON payload containing the crawl data (for example, a list of URLs or a text-based sitemap) to the `/summarize/crawl` endpoint.
 ```bash
