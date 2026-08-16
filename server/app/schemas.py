@@ -64,13 +64,22 @@ class TurboIntruderScript(BaseModel):
 
 class SecurityFinding(BaseModel):
     """Defines the structure for a single security finding."""
-    title: str = Field(..., description="A concise, descriptive title for the finding (e.g., 'Potential Reflected XSS').")
-    severity: str = Field(..., description="The estimated severity of the finding (e.g., 'High', 'Medium', 'Low', 'Informational').")
-    evidence: str = Field(..., description="A brief, specific quote from the request or response that supports the finding.")
-    description: str = Field(..., description="A clear explanation of the vulnerability or observation.")
-    confidence: str = Field(..., description="The confidence level of the finding (e.g., 'Confirmed', 'Potential').")
-    next_steps: str = Field(..., description="Clear, actionable next steps to confirm or exploit the finding.")
+    title: str = Field(..., description="A concise, descriptive title for the finding.")
+    severity: str = Field(..., description="The severity: Critical, High, Medium, Low, or Informational.")
+    stage: str = Field(default="Recon/Analysis", description="Lifecycle/Testing stage (e.g. Reconnaissance, Input Validation, Auth).")
+    owasp: str = Field(default="A01:2021", description="OWASP Top 10 category reference (e.g. A03:2021 - Injection).")
+    mitre: str = Field(default="CWE-200", description="MITRE CWE identifier or ATT&CK technique.")
+    confidence: str = Field(default="Confirmed", description="Confidence level: Confirmed or Potential.")
+    exploitability: str = Field(default="Medium", description="Ease of exploitation: High, Medium, Low, or Theoretical.")
+    description: str = Field(..., description="A clear, technical explanation of the vulnerability.")
+    evidence: str = Field(default="", description="The specific quote, parameter, or header that proves the finding.")
+    poc: str = Field(default="", description="Proof of concept steps, curl command, or attack vector payload.")
+    impact: str = Field(default="", description="Potential business and technical impact if exploited.")
+    next_steps: str = Field(default="", description="Immediate manual tests to confirm or dig deeper.")
+    remediation: str = Field(default="", description="Actionable recommendations to fix the vulnerability.")
 
 class SecurityAssessment(BaseModel):
     """Defines the overall structure for a security assessment of an HTTP pair."""
+    executive_summary: str = Field(default="", description="Executive summary with strategic overview of the target security posture.")
     findings: List[SecurityFinding] = Field(default_factory=list, description="A list of security findings identified in the HTTP pair.")
+    conclusion: str = Field(default="", description="Final security posture evaluation and next testing phase recommendations.")
