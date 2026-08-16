@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Jython Burp extension (run under Burp's Jython env).
 from burp import IBurpExtender, IContextMenuFactory, ITab
 from javax.swing import JMenuItem, JSplitPane, JScrollPane, JTable, JPanel, JButton, JTextPane, JFileChooser
@@ -124,110 +125,248 @@ class BurpThinkerTab(ITab):
             self._callbacks.printError(traceback.format_exc())
 
     def _format_json_to_html(self, data, target=None, action=None):
-        """Converts a JSON analysis object into a nicely formatted HTML string."""
+        """Converts a JSON analysis object into a professional, comprehensive HTML report."""
         try:
             if not isinstance(data, dict):
                 return u"<html><pre>" + safe_unicode(data) + u"</pre></html>"
 
-            # Basic CSS for styling
+            # Clean, modern CSS tailored for Swing JTextPane and HTML export
             style = u"""
             <style>
-                body { font-family: sans-serif; margin: 5px; }
-                .meta-box { background-color: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 15px; border-left: 5px solid #FF6633; }
-                h2 { color: #FF6633; border-bottom: 1px solid #FF6633; padding-bottom: 2px; margin-top: 15px;}
-                h3 { color: #333; margin-top: 10px; }
-                ul { list-style-type: disc; margin-left: 20px; }
-                li { margin-bottom: 5px; }
-                code { background-color: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
-                pre { background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
-                table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
-                th { background-color: #f2f2f2; }
-                .severity-high { background-color: #ffcdd2; }
-                .severity-medium { background-color: #fff9c4; }
-                .severity-low { background-color: #e8f5e9; }
-                .severity-informational { background-color: #e3f2fd; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 10px; color: #24292e; background-color: #ffffff; }
+                .header-card { background-color: #f6f8fa; border: 1px solid #e1e4e8; border-left: 6px solid #FF6633; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
+                .header-card h1 { margin: 0 0 6px 0; color: #1f2328; font-size: 18px; }
+                .header-meta { font-size: 12px; color: #57606a; margin: 2px 0; }
+                
+                .section-title { color: #1f2328; border-bottom: 2px solid #FF6633; padding-bottom: 4px; margin-top: 24px; margin-bottom: 12px; font-size: 16px; font-weight: bold; }
+                
+                .summary-box { background-color: #f0f7ff; border: 1px solid #cce5ff; border-left: 4px solid #0969da; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px; line-height: 1.5; font-size: 13px; }
+                .conclusion-box { background-color: #f6f8fa; border: 1px solid #d0d7de; border-left: 4px solid #1a7f37; padding: 12px 16px; border-radius: 4px; margin-top: 16px; margin-bottom: 16px; line-height: 1.5; font-size: 13px; }
+                
+                .metrics-container { margin-bottom: 18px; }
+                .badge-metric { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+                
+                .badge-critical { background-color: #cf222e; color: #ffffff; }
+                .badge-high { background-color: #d1242f; color: #ffffff; }
+                .badge-medium { background-color: #bf8700; color: #ffffff; }
+                .badge-low { background-color: #1a7f37; color: #ffffff; }
+                .badge-info { background-color: #0969da; color: #ffffff; }
+                .badge-tag { background-color: #afb8c133; color: #24292f; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+                
+                table.summary-table { border-collapse: collapse; width: 100%; margin-top: 8px; margin-bottom: 20px; font-size: 12px; }
+                table.summary-table th { background-color: #f6f8fa; color: #24292f; border: 1px solid #d0d7de; padding: 8px 10px; text-align: left; font-weight: 600; }
+                table.summary-table td { border: 1px solid #d0d7de; padding: 8px 10px; vertical-align: middle; }
+                table.summary-table tr:nth-child(even) { background-color: #fcfcfc; }
+                
+                .finding-card { border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 20px; background-color: #ffffff; }
+                .finding-header { padding: 10px 14px; border-bottom: 1px solid #d0d7de; background-color: #f6f8fa; }
+                .finding-header-title { font-size: 14px; font-weight: bold; margin: 0; display: inline-block; }
+                .finding-body { padding: 14px; }
+                
+                .field-row { margin-bottom: 12px; }
+                .field-label { font-weight: bold; font-size: 12px; color: #57606a; text-transform: uppercase; margin-bottom: 4px; }
+                .field-value { font-size: 13px; line-height: 1.5; color: #24292f; }
+                
+                code { background-color: #1e1e1e; color: #50fa7b; padding: 2px 5px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; font-size: 12px; }
+                pre { background-color: #181818; color: #f8f8f2; border: 1px solid #333333; padding: 10px 12px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; font-size: 11px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; margin: 4px 0 0 0; }
+                pre code { background-color: transparent; color: #f8f8f2; padding: 0; }
+                
+                .btn-download { display: inline-block; padding: 10px 22px; background-color: #1f883d; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 13px; }
             </style>
             """
             
             html = [u"<html><head>", style, u"</head><body>"]
             
-            # Add Target and Action metadata box at the top
-            if target or action:
-                html.append(u"<div class='meta-box'>")
-                if action:
-                    html.append(u"<strong>Action:</strong> " + safe_unicode(action) + u"<br/>")
-                if target:
-                    html.append(u"<strong>Target:</strong> <code>" + safe_unicode(target) + u"</code>")
-                html.append(u"</div>")
+            # --- Header Card ---
+            html.append(u"<div class='header-card'>")
+            html.append(u"<h1>Burp Thinker - Security Assessment Report</h1>")
+            if target:
+                html.append(u"<div class='header-meta'><strong>Target URL:</strong> <code>" + safe_unicode(target) + u"</code></div>")
+            if action:
+                html.append(u"<div class='header-meta'><strong>Analysis Action:</strong> " + safe_unicode(action) + u"</div>")
+            html.append(u"</div>")
             
-            # Handle SecurityAssessment schema specifically
+            # --- Check if schema is SecurityAssessment (contains 'findings') ---
             if "findings" in data and isinstance(data["findings"], list):
-                html.append(u"<h2>Security Assessment Findings</h2>")
-                if not data["findings"]:
-                    html.append(u"<p>No significant security findings were identified.</p>")
+                findings = data["findings"]
+                
+                # Calculate severity counts
+                crit_c = sum(1 for f in findings if safe_unicode(f.get("severity")).lower() == u"critical")
+                high_c = sum(1 for f in findings if safe_unicode(f.get("severity")).lower() == u"high")
+                med_c  = sum(1 for f in findings if safe_unicode(f.get("severity")).lower() == u"medium")
+                low_c  = sum(1 for f in findings if safe_unicode(f.get("severity")).lower() == u"low")
+                info_c = sum(1 for f in findings if safe_unicode(f.get("severity")).lower() in [u"informational", u"info"])
+                
+                # 1. Executive Summary
+                exec_sum = data.get("executive_summary")
+                if exec_sum:
+                    html.append(u"<div class='section-title'>1. Executive Summary</div>")
+                    html.append(u"<div class='summary-box'>" + safe_unicode(exec_sum) + u"</div>")
+                
+                # Severity Metrics Badges
+                html.append(u"<div class='metrics-container'>")
+                html.append(u"<strong>Severity Overview: </strong> ")
+                html.append(u"<span class='badge-metric badge-critical'>Critical: " + safe_unicode(crit_c) + u"</span>")
+                html.append(u"<span class='badge-metric badge-high'>High: " + safe_unicode(high_c) + u"</span>")
+                html.append(u"<span class='badge-metric badge-medium'>Medium: " + safe_unicode(med_c) + u"</span>")
+                html.append(u"<span class='badge-metric badge-low'>Low: " + safe_unicode(low_c) + u"</span>")
+                html.append(u"<span class='badge-metric badge-info'>Info: " + safe_unicode(info_c) + u"</span>")
+                html.append(u"</div>")
+                
+                # 2. Vulnerability Summary Table
+                html.append(u"<div class='section-title'>2. Vulnerability Summary Table</div>")
+                if not findings:
+                    html.append(u"<p style='color: #1a7f37;'><strong>✓ No significant security vulnerabilities identified in the evaluated HTTP interaction.</strong></p>")
                 else:
-                    html.append(u"<table>")
-                    html.append(u"<tr><th>Severity</th><th>Title</th><th>Confidence</th><th>Description</th><th>Evidence</th><th>Next Steps</th></tr>")
+                    html.append(u"<table class='summary-table'>")
+                    html.append(u"<thead><tr>")
+                    html.append(u"<th>#</th>")
+                    html.append(u"<th>Stage</th>")
+                    html.append(u"<th>Sev</th>")
+                    html.append(u"<th>Finding Title</th>")
+                    html.append(u"<th>OWASP</th>")
+                    html.append(u"<th>MITRE</th>")
+                    html.append(u"<th>Confidence</th>")
+                    html.append(u"<th>Exploitability</th>")
+                    html.append(u"</tr></thead><tbody>")
                     
-                    for finding in data["findings"]:
-                        severity = finding.get("severity", "Informational").lower()
-                        html.append(u"<tr class='severity-" + severity + u"'>")
-                        html.append(u"<td>" + safe_unicode(finding.get("severity")) + u"</td>")
-                        html.append(u"<td><strong>" + safe_unicode(finding.get("title")) + u"</strong></td>")
-                        html.append(u"<td>" + safe_unicode(finding.get("confidence")) + u"</td>")
-                        html.append(u"<td>" + safe_unicode(finding.get("description")) + u"</td>")
-                        html.append(u"<td><pre><code>" + safe_unicode(finding.get("evidence")).replace(u"<", u"&lt;") + u"</code></pre></td>")
-                        html.append(u"<td>" + safe_unicode(finding.get("next_steps")) + u"</td>")
+                    for idx, finding in enumerate(findings, start=1):
+                        sev = safe_unicode(finding.get("severity", "Informational"))
+                        sev_lower = sev.lower()
+                        badge_cls = "badge-info"
+                        if "crit" in sev_lower: badge_cls = "badge-critical"
+                        elif "high" in sev_lower: badge_cls = "badge-high"
+                        elif "med" in sev_lower: badge_cls = "badge-medium"
+                        elif "low" in sev_lower: badge_cls = "badge-low"
+                        
+                        html.append(u"<tr>")
+                        html.append(u"<td>" + safe_unicode(idx) + u"</td>")
+                        html.append(u"<td><span class='badge-tag'>" + safe_unicode(finding.get("stage", "Analysis")) + u"</span></td>")
+                        html.append(u"<td><span class='badge-metric " + badge_cls + u"'>" + sev + u"</span></td>")
+                        html.append(u"<td><strong>" + safe_unicode(finding.get("title", "Untitled")) + u"</strong></td>")
+                        html.append(u"<td><span class='badge-tag'>" + safe_unicode(finding.get("owasp", "N/A")) + u"</span></td>")
+                        html.append(u"<td><span class='badge-tag'>" + safe_unicode(finding.get("mitre", "N/A")) + u"</span></td>")
+                        html.append(u"<td>" + safe_unicode(finding.get("confidence", "Potential")) + u"</td>")
+                        html.append(u"<td>" + safe_unicode(finding.get("exploitability", "Medium")) + u"</td>")
                         html.append(u"</tr>")
                     
-                    html.append(u"</table>")
-
-            # Handle specific schemas or fallback to generic display
-            elif "script_code" in data: # Turbo Intruder Script
-                html.append(u"<h2>Generated Script</h2><pre><code>" + safe_unicode(data.get("script_code", "")).replace(u"<", u"&lt;") + u"</code></pre>")
-                html.append(u"<h2>Explanation</h2><p>" + safe_unicode(data.get("explanation", "")) + u"</p>")
-                if data.get("suggested_payloads"):
-                    html.append(u"<h2>Suggested Payloads</h2><ul>")
-                    for item in data["suggested_payloads"]:
-                        html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</code></li>")
-                    html.append("</ul>")
+                    html.append(u"</tbody></table>")
+                    
+                    # 3. Detailed Findings Section
+                    html.append(u"<div class='section-title'>3. Detailed Findings Breakdown</div>")
+                    for idx, finding in enumerate(findings, start=1):
+                        sev = safe_unicode(finding.get("severity", "Informational"))
+                        sev_lower = sev.lower()
+                        badge_cls = "badge-info"
+                        if "crit" in sev_lower: badge_cls = "badge-critical"
+                        elif "high" in sev_lower: badge_cls = "badge-high"
+                        elif "med" in sev_lower: badge_cls = "badge-medium"
+                        elif "low" in sev_lower: badge_cls = "badge-low"
+                        
+                        html.append(u"<div class='finding-card'>")
+                        html.append(u"<div class='finding-header'>")
+                        html.append(u"<span class='badge-metric " + badge_cls + u"'>" + sev + u"</span> ")
+                        html.append(u"<span class='finding-header-title'>#" + safe_unicode(idx) + u" - " + safe_unicode(finding.get("title")) + u"</span>")
+                        html.append(u"</div>")
+                        
+                        html.append(u"<div class='finding-body'>")
+                        
+                        # Description
+                        html.append(u"<div class='field-row'><div class='field-label'>Description</div>")
+                        html.append(u"<div class='field-value'>" + safe_unicode(finding.get("description")) + u"</div></div>")
+                        
+                        # Payload / Evidence
+                        evidence = finding.get("evidence") or finding.get("payload")
+                        if evidence:
+                            html.append(u"<div class='field-row'><div class='field-label'>Payload / Observed Evidence</div>")
+                            html.append(u"<pre><code>" + safe_unicode(evidence).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></pre></div>")
+                        
+                        # POC (Proof of Concept)
+                        poc = finding.get("poc")
+                        if poc:
+                            html.append(u"<div class='field-row'><div class='field-label'>Proof of Concept (PoC)</div>")
+                            html.append(u"<pre><code>" + safe_unicode(poc).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></pre></div>")
+                        
+                        # Impact
+                        impact = finding.get("impact")
+                        if impact:
+                            html.append(u"<div class='field-row'><div class='field-label'>Impact</div>")
+                            html.append(u"<div class='field-value'>" + safe_unicode(impact) + u"</div></div>")
+                        
+                        # Next Steps
+                        next_steps = finding.get("next_steps")
+                        if next_steps:
+                            html.append(u"<div class='field-row'><div class='field-label'>Next Steps (Verification)</div>")
+                            html.append(u"<div class='field-value'>" + safe_unicode(next_steps) + u"</div></div>")
+                        
+                        # Remediation
+                        remediation = finding.get("remediation")
+                        if remediation:
+                            html.append(u"<div class='field-row'><div class='field-label'>Remediation</div>")
+                            html.append(u"<div class='field-value'>" + safe_unicode(remediation) + u"</div></div>")
+                        
+                        html.append(u"</div></div>") # end finding-body & finding-card
+                
+                # 4. Conclusion
+                conclusion = data.get("conclusion")
+                if conclusion:
+                    html.append(u"<div class='section-title'>4. Conclusion</div>")
+                    html.append(u"<div class='conclusion-box'>" + safe_unicode(conclusion) + u"</div>")
             
-            elif "payloads" in data: # Generic payload list
-                 html.append(u"<h2>Generated Payloads</h2><ul>")
-                 for item in data["payloads"]:
-                    html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</code></li>")
-                 html.append(u"</ul>")
+            # --- Turbo Intruder Script schema ---
+            elif "script_code" in data:
+                html.append(u"<div class='section-title'>Turbo Intruder Script</div>")
+                html.append(u"<pre><code>" + safe_unicode(data.get("script_code", "")).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></pre>")
+                html.append(u"<div class='section-title'>Explanation</div><p>" + safe_unicode(data.get("explanation", "")) + u"</p>")
+                if data.get("suggested_payloads"):
+                    html.append(u"<div class='section-title'>Suggested Payloads</div><ul>")
+                    for item in data["suggested_payloads"]:
+                        html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></li>")
+                    html.append(u"</ul>")
+            
+            # --- Generic Payload List schema ---
+            elif "payloads" in data:
+                html.append(u"<div class='section-title'>Generated Payloads</div><ul>")
+                for item in data["payloads"]:
+                    html.append(u"<li><code>" + safe_unicode(item).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></li>")
+                html.append(u"</ul>")
 
-            else: # Generic analysis format
+            # --- Generic Analysis Fallback schema ---
+            else:
                 for key, value in data.items():
                     title = safe_unicode(key).replace(u"_", u" ").title()
-                    html.append(u"<h2>" + title + u"</h2>")
+                    html.append(u"<div class='section-title'>" + title + u"</div>")
                     
                     if isinstance(value, list) and value:
                         html.append(u"<ul>")
                         for item in value:
-                            html.append(u"<li>" + safe_unicode(item).replace(u"<", u"&lt;") + u"</li>")
+                            html.append(u"<li>" + safe_unicode(item).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</li>")
                         html.append(u"</ul>")
                     elif isinstance(value, dict) and value:
                         html.append(u"<ul>")
                         for k, v in value.items():
-                            html.append(u"<li><strong>" + safe_unicode(k) + u":</strong> " + safe_unicode(v).replace(u"<", u"&lt;") + u"</li>")
+                            html.append(u"<li><strong>" + safe_unicode(k) + u":</strong> " + safe_unicode(v).replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</li>")
                         html.append(u"</ul>")
                     elif isinstance(value, (str, unicode)) and value:
                         val_unicode = safe_unicode(value)
-                        if u"def " in val_unicode or u"import " in val_unicode:
-                             html.append(u"<pre><code>" + val_unicode.replace(u"<", u"&lt;") + u"</code></pre>")
+                        if u"def " in val_unicode or u"import " in val_unicode or u"{" in val_unicode:
+                            html.append(u"<pre><code>" + val_unicode.replace(u"<", u"&lt;").replace(u">", u"&gt;") + u"</code></pre>")
                         else:
                             html.append(u"<p>" + val_unicode + u"</p>")
-                    elif value is not None: # Handle other types like numbers
+                    elif value is not None:
                         html.append(u"<p>" + safe_unicode(value) + u"</p>")
                     else:
                         html.append(u"<p>N/A</p>")
 
-            # Add a download button at the bottom
-            html.append(u"<div style=\"text-align: center; margin-top: 20px;\"><a href=\"download_html_report\" style=\"display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;\">Download HTML Report</a></div>")
+            # Download Report Button
+            html.append(u"<div style=\"text-align: center; margin: 30px 0 10px 0;\"><a href=\"download_html_report\" class=\"btn-download\">Download HTML Report</a></div>")
             html.append(u"</body></html>")
+            return u"".join(html)
+        except Exception as e:
+            self._callbacks.printError("[UI ERROR] Failed in _format_json_to_html: %s" % str(e))
+            import traceback
+            self._callbacks.printError(traceback.format_exc())
+            return u"<html><body><h2>Error rendering HTML</h2><p>Check the Burp Extender error console for details.</p></body></html>"
             return u"".join(html)
         except Exception as e:
             self._callbacks.printError("[UI ERROR] Failed in _format_json_to_html: %s" % str(e))
