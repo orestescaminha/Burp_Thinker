@@ -204,16 +204,25 @@ Crawl Data:
 
 SECURITY_ASSESSMENT_JSON_STRUCTURE = """
 {
+  "executive_summary": "Executive summary of the security assessment and target posture",
   "findings": [
     {
-      "title": "string",
-      "severity": "string (High, Medium, Low, Informational)",
-      "evidence": "string (brief quote from request/response)",
-      "description": "string",
-      "confidence": "string (Confirmed, Potential)",
-      "next_steps": "string (actionable steps to confirm)"
+      "title": "Title of finding (e.g. Session Cookie Missing Secure Flag)",
+      "severity": "Critical | High | Medium | Low | Informational",
+      "stage": "Reconnaissance | Authentication | Authorization | Input Validation | Session Management | Configuration",
+      "owasp": "OWASP Category (e.g. A01:2021-Broken Access Control, A03:2021-Injection, A05:2021-Security Misconfiguration)",
+      "mitre": "CWE or ATT&CK ID (e.g. CWE-79, CWE-89, CWE-384, CWE-200)",
+      "confidence": "Confirmed | Potential",
+      "exploitability": "High | Medium | Low | Theoretical",
+      "description": "Detailed technical analysis of the vulnerability",
+      "evidence": "Minimal exact snippet/parameter/header from request or response proving the issue",
+      "poc": "Step-by-step reproduction guide, curl payload, or exploit string",
+      "impact": "Concrete technical and business impact if successfully exploited",
+      "next_steps": "Actionable testing steps to confirm or explore deeper",
+      "remediation": "Specific technical recommendations to remediate the vulnerability"
     }
-  ]
+  ],
+  "conclusion": "Final security posture evaluation and strategic next steps"
 }
 """
 
@@ -223,27 +232,29 @@ def build_security_assessment_prompt(raw_request: str, raw_response: str) -> str
 
     if locale.startswith("en"):
         instruction = """
-As a senior web application vulnerability analyst, analyze the provided HTTP request and response pair to produce a precise and evidence-based security assessment.
+As a senior web application penetration tester and vulnerability analyst, analyze the provided HTTP request and response pair to produce a rigorous, evidence-based security assessment report.
 
 **CRITICAL RULES:**
-- Be objective and factual. Base every statement on observable evidence from the provided data.
-- DO NOT repeat the full request/response; cite only the minimal snippets necessary as evidence.
-- If a vulnerability is only suspected, explicitly classify its `confidence` as "Potential" and clearly state the `next_steps` to confirm it.
-- If no relevant risk is found, return an empty `findings` list.
+- Be strictly objective and factual. Base every claim on concrete evidence observed in the data.
+- DO NOT duplicate the entire HTTP request or response; cite only minimal necessary snippets as evidence.
+- Include a high-level executive summary, a breakdown of findings with standard taxonomies (OWASP Top 10, MITRE CWE), actionable proof-of-concept (POC), real impact, next test steps, and clear remediation guidance.
+- Explicitly mark `confidence` as "Confirmed" (definitive proof observed) or "Potential" (suspicion requiring further verification).
+- If no vulnerabilities or noteworthy risks are identified, return an empty `findings` list and a clean executive summary / conclusion.
 
-Respond ONLY with a valid JSON object matching the structure below. Do not include markdown or any extra text.
+Respond ONLY with a valid JSON object matching the structure below. Do not include markdown fences outside the JSON, commentary, or text before/after.
 """
     else: # default: Portuguese
         instruction = """
-Como um analista sênior de vulnerabilidades em aplicações web, analise o par de requisição e resposta HTTP fornecido para produzir uma avaliação de segurança precisa e fundamentada em evidências.
+Como um analista sênior de vulnerabilidades em aplicações web e pentester, analise o par de requisição e resposta HTTP fornecido para produzir um relatório de avaliação de segurança rigoroso e fundamentado em evidências.
 
 **REGRAS CRÍTICAS:**
-- Seja objetivo e factual. Baseie cada afirmação em evidências observáveis nos dados fornecidos.
-- NÃO repita a requisição/resposta na íntegra; cite apenas os trechos mínimos necessários como evidência.
-- Caso a vulnerabilidade seja apenas uma suspeita, classifique sua `confidence` explicitamente como "Potencial" e indique claramente os `next_steps` para confirmá-la.
-- Se não houver risco relevante, retorne uma lista `findings` vazia.
+- Seja estritamente objetivo e factual. Baseie cada afirmação em evidências observáveis nos dados.
+- NÃO duplique a requisição ou resposta completa; cite apenas trechos mínimos necessários como evidência.
+- Forneça um resumo executivo de alto nível, detalhamento de cada achado com taxonomias padrão (OWASP Top 10, MITRE CWE), prova de conceito (POC) prática, impacto real, próximos passos de teste e remediação técnica clara.
+- Marque `confidence` explicitamente como "Confirmed" (prova definitiva observada) ou "Potential" (suspeita que requer validação adicional).
+- Se nenhum risco relevante for identificado, retorne a lista `findings` vazia com o resumo executivo e conclusão limpos.
 
-Responda APENAS com um objeto JSON válido que corresponda à estrutura abaixo. Não inclua markdown ou qualquer texto extra.
+Responda APENAS com um objeto JSON válido que corresponda à estrutura abaixo. Não inclua markdown fora do JSON ou comentários.
 """
 
     return f"""{instruction}
